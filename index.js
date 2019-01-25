@@ -2,80 +2,219 @@ var Promise = require('promise');
 var converter=require('hex2dec');
 var bytes=require('bytes');
 const monax = require('@monax/burrow');
+const assert = require('assert');
 var burrowURL = "localhost:10997"; // localhost:10997 if running locally on default port
-var account = '063298F02CDE6865C83229EFEDD690D3B1DDCF2F'; // address of the account to use for signing, hex string representation 
+var account = '2D250F314AB48700004E5DDE333A9ADB86FE789E'; // address of the account to use for signing, hex string representation 
 var options = {objectReturn: true};
 var burrow = monax.createInstance(burrowURL, account, options);
 
+let abi =[{
+		"constant": false,
+		"inputs": [],
+		"name": "kill",
+		"outputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"constant": false,
+		"inputs": [
+			{
+				"name": "x",
+				"type": "uint256"
+			}
+		],
+		"name": "set",
+		"outputs": [],
+		"payable": true,
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "get",
+		"outputs": [
+			{
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"constant": true,
+		"inputs": [],
+		"name": "getOwner",
+		"outputs": [
+			{
+				"name": "",
+				"type": "address"
+			}
+		],
+		"payable": false,
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"payable": false,
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"name": "x",
+				"type": "uint256"
+			}
+		],
+		"name": "notifyStorage",
+		"type": "event"
+	}];
 
+   
+let bytecode="608060405234801561001057600080fd5b5033600260006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506101fc806100616000396000f300608060405260043610610062576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806341c0e1b51461006757806360fe47b11461007e5780636d4ce63c1461009e578063893d20e8146100c9575b600080fd5b34801561007357600080fd5b5061007c610120565b005b61009c6004803603810190808035906020019092919050505061015b565b005b3480156100aa57600080fd5b506100b361019c565b6040518082815260200191505060405180910390f35b3480156100d557600080fd5b506100de6101a6565b604051808273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16ff5b806001819055507f23f9887eb044d32dba99d7b0b753c61c3c3b72d70ff0addb9a843542fd764212816040518082815260200191505060405180910390a150565b6000600154905090565b6000600260009054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050905600a165627a7a72305820efe43c98f939ca519e2b64247767bfd6f92a3dd5b31cb5d9f24e57723aaa306f0029";
+
+//Test Deploying by Method 1
+deployByMethod1(abi,bytecode);
+
+//Test Deploying by Method 2
+let addrFrom=new Buffer('2D250F314AB48700004E5DDE333A9ADB86FE789E','hex')
+deployByMethod2(bytecode,addrFrom,0,0,10000);
+
+//Get List Names
+listNames();
+
+//Get Account List
 listAccounts();
-//listNames();
 
-var Address1;
-var Seq1;
-getAccountByID(1).then(function(result){
-    console.log("Address1 is: ",result.Address.toString('hex'));
-    console.log("Sequence1 is: ",result.Sequence);
-    var payload = {Address: result.Address};
-    Address1 = result.Address;//.toString('hex');
-    let Seq1=result.Sequence;
-    getAccountBalance( payload ).then(
-    function(bal){
-        console.log("Balance1 is: ",bal);
-    },function(err){
-        console.log("get balance error");
+//Test Send Transaction 
+testSendTransactionAndGetBalance();
+
+
+
+function deployByMethod1(abi,bytecode)
+{
+    const contract = burrow.contracts.new(abi, bytecode);
+    console.log("Start Deploying By Method1...");
+    let ret=contract._constructor().then( address1 => {
+        console.log("Contract Address: ",address1);
+            return contract.set.at(address1,123456).then(() => contract.get.at(address1));
+        }).then(getValue => {
+            console.log('return value: ', getValue);
+        }).catch(err => console.log(err));
+
+}
+
+function deployByMethod2(bytecode,fromAddress,fee,amount,gaslimit)
+{
+    console.log("Start Deploying By Method2...");
+    return  burrow.transact.CallTxAsync({
+             Input:{
+                 Address: fromAddress,
+                 Amount: amount,
+             },
+             Address:  new Buffer(''),
+             GasLimit: gaslimit,
+             Fee:      fee,
+             Data:     bytecode,
+         })        
+         .then(txe => console.log(txe))
+         .catch(err => console.error(err));
+}
+
+function testSendTransactionAndGetBalance(){
+    var Address1;
+    var Address2;
+    var Seq1;
+
+    getAccountByID(1).then(function(result){
+        console.log("Address1 is: ",result.Address.toString('hex'));
+        console.log("Sequence1 is: ",result.Sequence);
+        var payload = {Address: result.Address};
+        Address1 = result.Address;//.toString('hex');
+        let Seq1=result.Sequence;
+        getAccountBalance( payload ).then(
+        function(bal){
+            console.log("Balance1 is: ",bal);
+        },function(err){
+            console.log("get balance error");
+        });
+    },function(err) {
+        console.log("Get Account Error: ",err);
     });
-},function(err) {
-    console.log("Get Account Error: ",err);
-});
-
-var Address2;
-getAccountAddressByID(2).then(function(result){
-    console.log("Address2 is: ",result.toString('hex'));
-    var payload = {Address: result};
-    let Address2 = result;//.toString('hex');
-    getAccountBalance( payload ).then(
-    function(bal){
-        console.log("Balance2 is: ",bal);
-
-        console.log("Sending some money from Address1 to Address2...");
-        let Seq=Seq1+1;
-        SendTx(Address1,Address2,Seq,999);
-        console.log("999$ Sent!");
-        var payload = {Address: Address1};
+    
+    getAccountAddressByID(2).then(function(result){
+        console.log("Address2 is: ",result.toString('hex'));
+        var payload = {Address: result};
+        Address2 = result;
         getAccountBalance( payload ).then(
             function(bal){
-                console.log("Now Balance1 is: ",bal);
-            },function(err){
-                console.log("get balance error");
-            });
-            CallTx(Address1,Address2,Seq,999);
-    },function(err){
-        console.log("get balance error");
-    });
-},function(err) {
-    console.log("Get Account Error: ",err);
-});
+                console.log("Balance2 is: ",bal);
+                console.log("Sending some money from Address1 to Address2...");
+                let Seq=Seq1+1;
+                SendTx(Address1,Address2,Seq,999).then(()=>{
+                    console.log("999$ Sent!");
+                    var payload = {Address: Address1};
+                    return getAccountBalance( payload ).then(
+                        function(bal){
+                            console.log("Now Balance1 is: ",bal);
+                        },function(err){
+                            console.log("get balance error");
+                        });
+                })
 
-var amount = 20;
+        },function(err){
+            console.log("get balance error");
+        });
+    },function(err) {
+        console.log("Get Account Error: ",err);
+    }); 
+}
 
-/*
-,function(retTX){
-    
-    console.log(retTX);
-});
-*/
+
 
 //Contract Deploy
 //var addressToCreate = "6075EADD0C7A33EE6153F3FA1B21E4D80045FCE2"
 
-
-
-
+	//Test Smart Contract
+	/*
+		pragma solidity ^0.4.24;
+		contract SimpleStorage {
+			uint private _balance;
+			uint private _storedData;
+			address private owner;
+			event notifyStorage(uint x);
+			constructor() public {
+				owner = msg.sender;
+			}
+			function set(uint x) public payable {
+				_storedData = x;
+				emit notifyStorage(x);
+			}
+			function get() public view returns (uint) {
+				return _storedData;
+			}
+			function getOwner() public view returns (address){
+				return owner;
+			}
+			function kill() public{
+				selfdestruct(owner);
+			}
+		}
+    */
+   
+////"608060405234801561001057600080fd5b506101ba806100206000396000f300608060405260043610610057576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806312065fe01461005c578063d27b2f8f1461008d578063ef59b435146100bd575b600080fd5b34801561006857600080fd5b50610071610107565b604051808260030b60030b815260200191505060405180910390f35b34801561009957600080fd5b506100bb600480360381019080803560030b906020019092919050505061011d565b005b3480156100c957600080fd5b506100eb600480360381019080803560030b9060200190929190505050610143565b604051808260030b60030b815260200191505060405180910390f35b60008060009054906101000a900460030b905090565b806000806101000a81548163ffffffff021916908360030b63ffffffff16021790555050565b6000816000809054906101000a900460030b016000806101000a81548163ffffffff021916908360030b63ffffffff1602179055506000809054906101000a900460030b90509190505600a165627a7a723058200270790021d6119b97b5074b4ce02216dfd5588c668f661ab747689b260ef6dd0029",
 
 function SendTx(fromAddr,toAddr,seq,amount)
 {
-    burrow.transact.SendTxSync(
+    return burrow.transact.SendTxSync(
         {
             Inputs: [{
                 Address: fromAddr,//Buffer.from(from, 'hex'),
@@ -91,20 +230,20 @@ function SendTx(fromAddr,toAddr,seq,amount)
         .catch(err => console.error(err));
 }
 
-function CallTx(fromAddr,toAddr,seq,amount)
-{
-    burrow.transact.CallTxSync(
-        {
+function CallTx(fromAddr,toAddr,seq,amount,fee,gaslimit,data)
+{    
+   console.log("Start Deploying...");
+   return  burrow.transact.CallTxAsync({
             Input:{
-                Address: fromAddr,//Buffer.from(from, 'hex'),
+                Address: fromAddr, //Buffer.from('063298F02CDE6865C83229EFEDD690D3B1DDCF2F', 'hex'),
                 Amount: amount,
                 Sequence: seq,
             },
-            Address:  new Buffer(),
-            GasLimit: 100,
-            Fee:      10,
-            Data: "608060405234801561001057600080fd5b506040516020806108b28339810180604052602081101561003057600080fd5b8101908080519060200190929190505050336000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555060018060008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600001819055508060ff166002816100fa9190610101565b5050610154565b81548183558181111561012857818360005260206000209182019101610127919061012d565b5b505050565b61015191905b8082111561014d5760008082016000905550600101610133565b5090565b90565b61074f806101636000396000f3fe60806040526004361061005c576000357c0100000000000000000000000000000000000000000000000000000000900480635c19a95c14610061578063609ff1bd146100b25780639e7b8d61146100e3578063b3f98adc14610134575b600080fd5b34801561006d57600080fd5b506100b06004803603602081101561008457600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610172565b005b3480156100be57600080fd5b506100c76104c7565b604051808260ff1660ff16815260200191505060405180910390f35b3480156100ef57600080fd5b506101326004803603602081101561010657600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610543565b005b34801561014057600080fd5b506101706004803603602081101561015757600080fd5b81019080803560ff169060200190929190505050610640565b005b6000600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002090508060010160009054906101000a900460ff16156101d257506104c4565b5b600073ffffffffffffffffffffffffffffffffffffffff16600160008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060010160029054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161415801561030057503373ffffffffffffffffffffffffffffffffffffffff16600160008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060010160029054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614155b1561036f57600160008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060010160029054906101000a900473ffffffffffffffffffffffffffffffffffffffff1691506101d3565b3373ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1614156103a957506104c4565b60018160010160006101000a81548160ff021916908315150217905550818160010160026101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506000600160008473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002090508060010160009054906101000a900460ff16156104aa57816000015460028260010160019054906101000a900460ff1660ff1681548110151561048b57fe5b90600052602060002001600001600082825401925050819055506104c1565b816000015481600001600082825401925050819055505b50505b50565b6000806000905060008090505b6002805490508160ff16101561053e578160028260ff168154811015156104f757fe5b906000526020600020016000015411156105315760028160ff1681548110151561051d57fe5b906000526020600020016000015491508092505b80806001019150506104d4565b505090565b6000809054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff163373ffffffffffffffffffffffffffffffffffffffff161415806105eb5750600160008273ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002060010160009054906101000a900460ff165b156105f55761063d565b60018060008373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001908152602001600020600001819055505b50565b6000600160003373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200190815260200160002090508060010160009054906101000a900460ff16806106a857506002805490508260ff1610155b156106b35750610720565b60018160010160006101000a81548160ff021916908315150217905550818160010160016101000a81548160ff021916908360ff160217905550806000015460028360ff1681548110151561070457fe5b9060005260206000200160000160008282540192505081905550505b5056fea165627a7a723058209061ffc04667804683fe01748db07db99f66b416464677c76a87e047d3ff2a430029",
-        })
+            Address:  toAddr,
+            GasLimit: gaslimit,
+            Fee:      fee,
+            Data:     data
+        })        
         .then(txe => console.log(txe))
         .catch(err => console.error(err));
 }
@@ -156,7 +295,9 @@ function listAccounts()
     return new Promise(function (resolve, reject) {
         burrow.query.ListAccounts('', (error,data)=>{
             if(data){    
-                console.log("data-->",data)                                           
+                console.log("===============\nAddress: ",data.Address.toString('hex')) 
+                console.log("Balance: ",data.Balance) 
+                console.log("Sequence: ",data.Sequence,"\n===============") 
                 resolve(data);
             }    
             else{
