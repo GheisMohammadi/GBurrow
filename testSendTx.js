@@ -34,8 +34,8 @@ burrow.getAccountAddressByID(2).then(function(result){
             console.log("Balance2 is: ",bal);
             console.log("Sending some money from Address1 to Address2...");
             let Seq=Seq1+1;
-            burrow.SendTx(Address1,Address2,Seq,999).then(()=>{
-                console.log("999$ Sent!");
+            burrow.SendTx(Address1,Address2,Seq,10).then(()=>{
+                console.log("10$ Sent!");
                 var payload = {Address: Address1};
                 return burrow.getAccountBalance( payload ).then(
                     function(bal){
